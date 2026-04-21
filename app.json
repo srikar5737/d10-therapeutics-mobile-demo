@@ -39,7 +39,8 @@
           "isBackgroundEnabled": false,
           "neverForLocation": true
         }
-      ]
+      ],
+      "expo-font"
     ]
   }
 }

@@ -19,7 +19,7 @@ export function TrendsScreen() {
   const [selectedRange, setSelectedRange] = useState<Range>('week');
 
   const metrics = [
-    { id: 'hemoglobin', label: 'Hemoglobin', unit: 'g/dL', color: '#7b3200' },
+    { id: 'hemoglobin', label: 'Hb Trend', unit: '', color: '#7b3200' },
     { id: 'spo2', label: 'SpO₂ Level', unit: '%', color: '#00488d' },
     { id: 'heartRate', label: 'Heart Rate', unit: 'bpm', color: '#ba1a1a' },
     { id: 'temperature', label: 'Temperature', unit: '°F', color: '#a04401' },
@@ -75,9 +75,9 @@ export function TrendsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.noteTitle}>Clinical Note</Text>
             <Text style={styles.noteText}>
-              Hemoglobin has shown a slight downward trend over the past 72
-              hours. Continue monitoring hydration levels and adhere to current
-              pain management protocol. SpO₂ remains optimal.
+              The Hb trend index has shown a slight downward drift over the past
+              72 hours. Continue monitoring hydration levels and adhere to the
+              current pain management protocol. SpO₂ remains optimal.
             </Text>
           </View>
         </View>
@@ -131,9 +131,18 @@ function TrendCard({ metricId, label, unit, color, range }: TrendCardProps) {
 
   const areaPath = linePath + ` L ${width} ${height} L 0 ${height} Z`;
 
-  const changeIcon = 'minus';
-  const changeColor = Colors.primary;
-  const changeLabel = 'Stable';
+  const first = values[0];
+  const delta = currentValue - first;
+  const stableThreshold = Math.max((max - min) * 0.15, 0.1);
+  let changeIcon: 'minus' | 'trending-up' | 'trending-down' = 'minus';
+  let changeColor: string = Colors.primary;
+  let changeLabel = 'Stable';
+  if (Math.abs(delta) >= stableThreshold) {
+    const roundedDelta = Math.round(delta * 10) / 10;
+    changeIcon = delta > 0 ? 'trending-up' : 'trending-down';
+    changeColor = delta > 0 ? Colors.tertiary : Colors.primary;
+    changeLabel = `${roundedDelta > 0 ? '+' : ''}${roundedDelta} ${unit}`.trim();
+  }
 
   return (
     <View style={styles.trendOuter}>

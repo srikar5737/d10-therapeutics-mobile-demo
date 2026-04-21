@@ -9,10 +9,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, FontSize, FontWeight, Shadows } from '../theme/tokens';
-import { useVitals, useRiskStatus } from '../components/useSensorData';
+import { useVitals, useRiskStatus, useWearableRuntime } from '../components/useSensorData';
 import { VitalCard } from '../components/VitalCard';
 import { RiskGauge } from '../components/RiskGauge';
 import { EmergencyModal } from '../components/EmergencyModal';
+import { WearableConnectionPill } from '../components/WearableConnectionPill';
+import { WearableDevPanel } from '../components/WearableDevPanel';
+import { signOutDemoSession } from '../state/session';
 
 interface Props {
   navigation: any;
@@ -20,17 +23,29 @@ interface Props {
 
 export function DashboardScreen({ navigation }: Props) {
   const [emergencyVisible, setEmergencyVisible] = useState(false);
+  const [devPanelVisible, setDevPanelVisible] = useState(false);
   const { vitals, loading: vitalsLoading } = useVitals();
   const { risk, loading: riskLoading } = useRiskStatus();
+  const { runtime, setMode, connect, disconnect, injectSamplePayload } = useWearableRuntime();
+  const vitalRows = Array.from({ length: Math.ceil(vitals.length / 2) }, (_, rowIndex) =>
+    vitals.slice(rowIndex * 2, rowIndex * 2 + 2)
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <View style={styles.avatar}>
+        <TouchableOpacity
+          style={styles.avatar}
+          activeOpacity={0.8}
+          onLongPress={() => setDevPanelVisible(true)}
+        >
           <MaterialCommunityIcons name="account" size={22} color={Colors.primary} />
+        </TouchableOpacity>
+        <View style={styles.titleWrap}>
+          <Text style={styles.topBarTitle}>Metasebya Health</Text>
+          <WearableConnectionPill state={runtime.connectionState} />
         </View>
-        <Text style={styles.topBarTitle}>Metasebya Health</Text>
         <TouchableOpacity
           style={styles.emergencyChip}
           onPress={() => setEmergencyVisible(true)}
@@ -62,18 +77,13 @@ export function DashboardScreen({ navigation }: Props) {
               <Text style={styles.loadingText}>Syncing with wearable...</Text>
             </View>
           ) : (
-            <>
-              <View style={styles.vitalsRow}>
-                {vitals[0] && <VitalCard vital={vitals[0]} />}
+            vitalRows.map((row, rowIndex) => (
+              <View style={styles.vitalsRow} key={rowIndex}>
+                {row[0] ? <VitalCard vital={row[0]} /> : <View style={styles.vitalPlaceholder} />}
                 <View style={{ width: Spacing.lg }} />
-                {vitals[1] && <VitalCard vital={vitals[1]} />}
+                {row[1] ? <VitalCard vital={row[1]} /> : <View style={styles.vitalPlaceholder} />}
               </View>
-              <View style={styles.vitalsRow}>
-                {vitals[2] && <VitalCard vital={vitals[2]} />}
-                <View style={{ width: Spacing.lg }} />
-                {vitals[3] && <VitalCard vital={vitals[3]} />}
-              </View>
-            </>
+            ))
           )}
         </View>
 
@@ -105,6 +115,16 @@ export function DashboardScreen({ navigation }: Props) {
         visible={emergencyVisible}
         onClose={() => setEmergencyVisible(false)}
       />
+      <WearableDevPanel
+        visible={devPanelVisible}
+        runtime={runtime}
+        onClose={() => setDevPanelVisible(false)}
+        onModeChange={setMode}
+        onConnectBle={connect}
+        onDisconnectBle={disconnect}
+        onInjectSample={injectSamplePayload}
+        onSignOut={signOutDemoSession}
+      />
     </SafeAreaView>
   );
 }
@@ -129,6 +149,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceVariant,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  titleWrap: {
+    flex: 1,
+    marginHorizontal: Spacing.md,
   },
   topBarTitle: {
     fontSize: FontSize.lg,
@@ -171,6 +195,9 @@ const styles = StyleSheet.create({
   },
   vitalsRow: {
     flexDirection: 'row',
+  },
+  vitalPlaceholder: {
+    flex: 1,
   },
   loadingContainer: {
     height: 140,

@@ -125,7 +125,7 @@ export const mockRiskStatus: VocRiskStatus = {
 
 export const lastSyncedTime = 'Today, 10:42 AM';
 
-function generateTrendPoints(
+export function generateTrendPoints(
   base: number,
   variance: number,
   days: number

@@ -13,7 +13,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.d10therapeutics.mobiledemo",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "D-10 Therapeutics connects to your wearable to read live vital snapshots during monitoring.",
+        "NSBluetoothPeripheralUsageDescription": "D-10 Therapeutics uses Bluetooth to communicate with your wearable for live vital readings."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -25,6 +30,16 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-dev-client",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "neverForLocation": true
+        }
+      ]
+    ]
   }
 }

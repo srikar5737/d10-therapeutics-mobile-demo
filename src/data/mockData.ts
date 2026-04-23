@@ -82,6 +82,12 @@ export interface SensorDataAdapter {
 
 // ── Mock Data ──────────────────────────────────────────
 
+/**
+ * Mock vitals mirror the live wearable shape so mock mode and BLE mode show
+ * the same cards. Blood Oxygen / Heart Rate / Hb Trend represent the LIVE
+ * wearable fields; Temperature is a fallback/demo-only card because the
+ * hardware does not emit temperature today.
+ */
 export const mockVitals: VitalReading[] = [
   {
     label: 'Blood Oxygen',
@@ -108,11 +114,12 @@ export const mockVitals: VitalReading[] = [
     normalRange: '97.8–99.1',
   },
   {
-    label: 'Hydration',
-    value: 'Optimal',
-    unit: '',
-    icon: 'water',
+    label: 'Hb Trend',
+    value: '81.2',
+    unit: 'idx',
+    icon: 'water-percent',
     status: 'optimal',
+    normalRange: '75–99',
   },
 ];
 
@@ -145,12 +152,12 @@ export function generateTrendPoints(
 export const mockTrends: TrendMetric[] = [
   {
     id: 'hemoglobin',
-    label: 'Hemoglobin',
-    unit: 'g/dL',
+    label: 'Hb Trend',
+    unit: 'idx',
     color: '#7b3200',
-    data: generateTrendPoints(9.2, 1.6, 7),
-    currentValue: 9.2,
-    change: '-0.4 from last week',
+    data: generateTrendPoints(80.5, 3.0, 7),
+    currentValue: 80.5,
+    change: '-1.2 from last week',
     changeDirection: 'down',
   },
   {

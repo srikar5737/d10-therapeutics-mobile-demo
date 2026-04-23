@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -11,9 +11,21 @@ import { PainTrackerScreen } from './src/screens/PainTrackerScreen';
 import { CrisisEventsScreen } from './src/screens/CrisisEventsScreen';
 import { MedicationsScreen } from './src/screens/MedicationsScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
-import { ClinicianDashboardScreen } from './src/screens/ClinicianDashboardScreen';
+import { CaregiverDashboardScreen } from './src/screens/CaregiverDashboardScreen';
+import { HematologistDashboardScreen } from './src/screens/HematologistDashboardScreen';
+import { AlertCenterScreen } from './src/screens/AlertCenterScreen';
 import { Colors, FontWeight } from './src/theme/tokens';
 import { useDemoSession } from './src/state/session';
+import { seedDemoAlerts } from './src/services/notificationService';
+import { startLivePainMonitor } from './src/services/livePainMonitor';
+import { connectToWearable } from './src/data/SensorAdapter';
+
+// Seed demo alert data once at module load time (idempotent)
+seedDemoAlerts();
+
+// Start the live pain → alert bridge. Safe in mock mode: emits nothing unless
+// a wearable snapshot actually includes painLevel while fingerDetected=true.
+startLivePainMonitor();
 
 const Tab = createBottomTabNavigator();
 
@@ -49,6 +61,12 @@ const tabConfig: Record<
 };
 
 function PatientApp() {
+  useEffect(() => {
+    if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      connectToWearable().catch(() => {});
+    }
+  }, []);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -100,6 +118,32 @@ function PatientApp() {
   );
 }
 
+function CaregiverApp({ email }: { email: string }) {
+  const [alertCenterOpen, setAlertCenterOpen] = useState(false);
+  if (alertCenterOpen) {
+    return <AlertCenterScreen onClose={() => setAlertCenterOpen(false)} />;
+  }
+  return (
+    <CaregiverDashboardScreen
+      email={email}
+      onOpenAlertCenter={() => setAlertCenterOpen(true)}
+    />
+  );
+}
+
+function HematologistApp({ email }: { email: string }) {
+  const [alertCenterOpen, setAlertCenterOpen] = useState(false);
+  if (alertCenterOpen) {
+    return <AlertCenterScreen onClose={() => setAlertCenterOpen(false)} />;
+  }
+  return (
+    <HematologistDashboardScreen
+      email={email}
+      onOpenAlertCenter={() => setAlertCenterOpen(true)}
+    />
+  );
+}
+
 export default function App() {
   const session = useDemoSession();
 
@@ -112,8 +156,10 @@ export default function App() {
         <NavigationContainer>
           <PatientApp />
         </NavigationContainer>
+      ) : session.role === 'caregiver' ? (
+        <CaregiverApp email={session.email} />
       ) : (
-        <ClinicianDashboardScreen role={session.role} email={session.email} />
+        <HematologistApp email={session.email} />
       )}
     </SafeAreaProvider>
   );

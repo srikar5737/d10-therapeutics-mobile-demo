@@ -11,19 +11,34 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Svg, { Path, Circle, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { Colors, Spacing, Radius, FontSize, FontWeight, Shadows } from '../theme/tokens';
-import { useTrends } from '../components/useSensorData';
+import { useLivePain, useTrends } from '../components/useSensorData';
 
 type Range = 'day' | 'week' | 'month';
 
+// Live wearable metrics shown first. Temperature is kept as a
+// demo/fallback card because the hardware does not emit it today.
+type MetricConfig = {
+  id: string;
+  label: string;
+  unit: string;
+  color: string;
+  /** True when the wearable is the source of record for this metric. */
+  isLive: boolean;
+};
+
+const LIVE_METRICS: MetricConfig[] = [
+  { id: 'spo2', label: 'SpO₂ Level', unit: '%', color: '#00488d', isLive: true },
+  { id: 'heartRate', label: 'Heart Rate', unit: 'bpm', color: '#ba1a1a', isLive: true },
+  { id: 'hemoglobin', label: 'Hb Trend Index', unit: 'idx', color: '#7b3200', isLive: true },
+];
+
+const DEMO_METRICS: MetricConfig[] = [
+  { id: 'temperature', label: 'Temperature', unit: '°F', color: '#a04401', isLive: false },
+];
+
 export function TrendsScreen() {
   const [selectedRange, setSelectedRange] = useState<Range>('week');
-
-  const metrics = [
-    { id: 'hemoglobin', label: 'Hb Trend', unit: '', color: '#7b3200' },
-    { id: 'spo2', label: 'SpO₂ Level', unit: '%', color: '#00488d' },
-    { id: 'heartRate', label: 'Heart Rate', unit: 'bpm', color: '#ba1a1a' },
-    { id: 'temperature', label: 'Temperature', unit: '°F', color: '#a04401' },
-  ];
+  const livePain = useLivePain();
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -58,9 +73,38 @@ export function TrendsScreen() {
           ))}
         </View>
 
-        {/* Metric Cards */}
-        {metrics.map((m) => (
-          <TrendCard key={m.id} metricId={m.id} label={m.label} unit={m.unit} color={m.color} range={selectedRange} />
+        {/* Live pain summary — only rendered when the wearable itself reports
+            a pain level. Self-reported pain from the Log Pain screen is not
+            shown here to avoid double-counting. */}
+        {livePain.isLive && livePain.painLevel !== null ? (
+          <LivePainSummaryCard painLevel={livePain.painLevel} />
+        ) : null}
+
+        {/* Live metric cards (wearable-driven) */}
+        {LIVE_METRICS.map((m) => (
+          <TrendCard
+            key={m.id}
+            metricId={m.id}
+            label={m.label}
+            unit={m.unit}
+            color={m.color}
+            range={selectedRange}
+            isLive
+          />
+        ))}
+
+        {/* Demo/fallback cards — clearly tagged so they are not confused
+            with live wearable data. */}
+        {DEMO_METRICS.map((m) => (
+          <TrendCard
+            key={m.id}
+            metricId={m.id}
+            label={m.label}
+            unit={m.unit}
+            color={m.color}
+            range={selectedRange}
+            isLive={false}
+          />
         ))}
 
         {/* Clinical Note */}
@@ -75,14 +119,59 @@ export function TrendsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.noteTitle}>Clinical Note</Text>
             <Text style={styles.noteText}>
-              The Hb trend index has shown a slight downward drift over the past
-              72 hours. Continue monitoring hydration levels and adhere to the
-              current pain management protocol. SpO₂ remains optimal.
+              The Hb Trend Index is a relative indicator on a 0–99.99 scale —
+              not an absolute hemoglobin lab value. Continue routine
+              self-care, take medications on schedule, and log pain as it
+              changes. SpO₂ and heart rate trends remain the primary live
+              indicators.
             </Text>
           </View>
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+// ── Live pain summary card ──────────────────────────────
+
+function getLivePainTone(level: number) {
+  if (level >= 8) return { color: Colors.error, label: 'Severe' };
+  if (level >= 6) return { color: '#a04401', label: 'High' };
+  if (level >= 4) return { color: '#b08000', label: 'Moderate' };
+  return { color: Colors.primary, label: 'Mild' };
+}
+
+function LivePainSummaryCard({ painLevel }: { painLevel: number }) {
+  const tone = getLivePainTone(painLevel);
+  return (
+    <View style={styles.trendOuter}>
+      <View style={[styles.trendCard, Shadows.sm]}>
+        <View style={[styles.trendAccent, { backgroundColor: tone.color + 'CC' }]} />
+        <View style={styles.trendContent}>
+          <View style={styles.trendHeader}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.liveBadgeRow}>
+                <MaterialCommunityIcons name="access-point" size={12} color={tone.color} />
+                <Text style={[styles.liveBadgeText, { color: tone.color }]}>LIVE</Text>
+              </View>
+              <Text style={styles.trendLabel}>Current Pain</Text>
+              <Text style={styles.trendEyebrow}>Reported by wearable</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={styles.trendValue}>
+                {painLevel}
+                <Text style={styles.trendUnit}> / 10</Text>
+              </Text>
+              <View style={[styles.changeBadge, { backgroundColor: tone.color + '15' }]}>
+                <Text style={[styles.changeText, { color: tone.color }]}>
+                  {tone.label}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -94,9 +183,12 @@ interface TrendCardProps {
   unit: string;
   color: string;
   range: 'day' | 'week' | 'month';
+  /** When false, the card is rendered with a "Demo value" tag so the user
+   *  knows the metric is not currently driven by the wearable. */
+  isLive: boolean;
 }
 
-function TrendCard({ metricId, label, unit, color, range }: TrendCardProps) {
+function TrendCard({ metricId, label, unit, color, range, isLive }: TrendCardProps) {
   const { data, loading } = useTrends(metricId, range);
   const width = Dimensions.get('window').width - 80;
   const height = 100;
@@ -151,9 +243,21 @@ function TrendCard({ metricId, label, unit, color, range }: TrendCardProps) {
         <View style={styles.trendContent}>
           {/* Header row */}
           <View style={styles.trendHeader}>
-            <View>
+            <View style={{ flex: 1 }}>
+              {!isLive ? (
+                <View style={styles.demoBadgeRow}>
+                  <MaterialCommunityIcons
+                    name="flask-outline"
+                    size={12}
+                    color={Colors.onSurfaceVariant}
+                  />
+                  <Text style={styles.demoBadgeText}>DEMO VALUE</Text>
+                </View>
+              ) : null}
               <Text style={styles.trendLabel}>{label}</Text>
-              <Text style={styles.trendEyebrow}>7-Day Moving Average</Text>
+              <Text style={styles.trendEyebrow}>
+                {isLive ? '7-Day Moving Average' : 'Not from wearable'}
+              </Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={styles.trendValue}>
@@ -317,6 +421,39 @@ const styles = StyleSheet.create({
   changeText: {
     fontSize: FontSize.xs,
     fontWeight: FontWeight.semibold,
+  },
+  demoBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surfaceContainerHigh,
+    marginBottom: 4,
+  },
+  demoBadgeText: {
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
+    color: Colors.onSurfaceVariant,
+    letterSpacing: 0.8,
+  },
+  liveBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surfaceContainer,
+    marginBottom: 4,
+  },
+  liveBadgeText: {
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 0.8,
   },
   xLabels: {
     flexDirection: 'row',

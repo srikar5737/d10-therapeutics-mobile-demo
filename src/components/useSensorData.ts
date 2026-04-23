@@ -13,8 +13,12 @@ import { useState, useEffect, useRef } from 'react';
 import {
   connectToWearable,
   disconnectWearable,
+  getLatestLiveWearableVitals,
+  getLatestPainState,
   getSensorRuntimeState,
   injectSimulatedWearablePayload,
+  LivePainState,
+  LiveWearableVitals,
   SensorAdapter,
   SensorMode,
   SensorRuntimeState,
@@ -125,6 +129,54 @@ export function useTrends(metricId: string, range: 'day' | 'week' | 'month') {
   }, [metricId, range]);
 
   return { data, loading };
+}
+
+/**
+ * Subscribes to the wearable-reported pain level.
+ * Returns `painLevel: null` when the hardware has not provided one — callers
+ * should fall back to their existing manual/demo pain source in that case.
+ */
+export function useLivePain() {
+  const [painState, setPainState] = useState<LivePainState>(() =>
+    getLatestPainState()
+  );
+
+  useEffect(() => {
+    setPainState(getLatestPainState());
+    const unsubscribe = subscribeSensorData(() => {
+      setPainState(getLatestPainState());
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  return painState;
+}
+
+/**
+ * Subscribes to the full live-wearable vitals set (SpO₂, heart rate,
+ * Hb Trend Index, pain, battery, fingerDetected).
+ *
+ * `isLive` is false in mock-only mode or when no finger is detected — callers
+ * should keep showing seeded demo values in those cases (hybrid adapter).
+ */
+export function useLiveWearableVitals() {
+  const [vitals, setVitals] = useState<LiveWearableVitals>(() =>
+    getLatestLiveWearableVitals()
+  );
+
+  useEffect(() => {
+    setVitals(getLatestLiveWearableVitals());
+    const unsubscribe = subscribeSensorData(() => {
+      setVitals(getLatestLiveWearableVitals());
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  return vitals;
 }
 
 export function useWearableRuntime() {

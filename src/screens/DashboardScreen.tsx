@@ -9,7 +9,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, FontSize, FontWeight, Shadows } from '../theme/tokens';
-import { useVitals, useRiskStatus, useWearableRuntime } from '../components/useSensorData';
+import {
+  useLivePain,
+  useRiskStatus,
+  useVitals,
+  useWearableRuntime,
+} from '../components/useSensorData';
 import { VitalCard } from '../components/VitalCard';
 import { RiskGauge } from '../components/RiskGauge';
 import { EmergencyModal } from '../components/EmergencyModal';
@@ -26,6 +31,7 @@ export function DashboardScreen({ navigation }: Props) {
   const [devPanelVisible, setDevPanelVisible] = useState(false);
   const { vitals, loading: vitalsLoading } = useVitals();
   const { risk, loading: riskLoading } = useRiskStatus();
+  const livePain = useLivePain();
   const { runtime, setMode, connect, disconnect, injectSamplePayload } = useWearableRuntime();
   const vitalRows = Array.from({ length: Math.ceil(vitals.length / 2) }, (_, rowIndex) =>
     vitals.slice(rowIndex * 2, rowIndex * 2 + 2)
@@ -67,8 +73,31 @@ export function DashboardScreen({ navigation }: Props) {
           </Text>
         </View>
 
+        {/* In-app patient alert banner (supportive, not alarming) */}
+        {risk && (risk.level === 'high' || risk.level === 'moderate') && (
+          <View style={styles.patientAlertBanner}>
+            <MaterialCommunityIcons
+              name={risk.level === 'high' ? 'alert-circle' : 'information'}
+              size={18}
+              color={risk.level === 'high' ? Colors.error : '#a04401'}
+            />
+            <Text style={[styles.patientAlertText, { color: risk.level === 'high' ? Colors.error : '#a04401' }]}>
+              {risk.level === 'high'
+                ? "Your readings suggest you may be experiencing elevated stress on your body. Please rest, drink fluids, and contact your caregiver."
+                : "Some of your readings are slightly elevated today. Rest, stay hydrated, and monitor how you feel."}
+            </Text>
+          </View>
+        )}
+
         {/* VOC Risk Gauge */}
         {risk && <RiskGauge risk={risk} />}
+
+        {/* Live pain pill — only shown when the wearable actually reports pain.
+            When painLevel is null the patient still uses the "Log Pain Level"
+            CTA below to self-report, so no placeholder is shown here. */}
+        {livePain.isLive && livePain.painLevel !== null ? (
+          <LivePainPill painLevel={livePain.painLevel} />
+        ) : null}
 
         {/* Vitals Bento Grid */}
         <View style={styles.vitalsGrid}>
@@ -126,6 +155,36 @@ export function DashboardScreen({ navigation }: Props) {
         onSignOut={signOutDemoSession}
       />
     </SafeAreaView>
+  );
+}
+
+function getLivePainTone(level: number) {
+  if (level >= 8) return { color: Colors.error, label: 'Severe' };
+  if (level >= 6) return { color: '#a04401', label: 'High' };
+  if (level >= 4) return { color: '#b08000', label: 'Moderate' };
+  return { color: Colors.primary, label: 'Mild' };
+}
+
+function LivePainPill({ painLevel }: { painLevel: number }) {
+  const tone = getLivePainTone(painLevel);
+  return (
+    <View style={[styles.livePainCard, { borderLeftColor: tone.color }]}>
+      <View style={styles.livePainBadge}>
+        <MaterialCommunityIcons name="access-point" size={12} color={tone.color} />
+        <Text style={[styles.livePainBadgeText, { color: tone.color }]}>LIVE</Text>
+      </View>
+      <View style={styles.livePainBody}>
+        <Text style={styles.livePainLabel}>Current Pain</Text>
+        <View style={styles.livePainValueRow}>
+          <Text style={[styles.livePainValue, { color: tone.color }]}>
+            {painLevel}
+            <Text style={styles.livePainDenominator}> / 10</Text>
+          </Text>
+          <Text style={[styles.livePainTone, { color: tone.color }]}>{tone.label}</Text>
+        </View>
+        <Text style={styles.livePainHint}>Reported by wearable</Text>
+      </View>
+    </View>
   );
 }
 
@@ -236,5 +295,79 @@ const styles = StyleSheet.create({
     color: Colors.onSurface,
     fontSize: FontSize.base,
     fontWeight: FontWeight.semibold,
+  },
+  patientAlertBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    backgroundColor: '#fff8f0',
+    borderRadius: Radius.lg,
+    borderLeftWidth: 3,
+    borderLeftColor: '#a04401',
+    padding: Spacing.md,
+  },
+  patientAlertText: {
+    flex: 1,
+    fontSize: FontSize.sm,
+    lineHeight: 20,
+    fontWeight: FontWeight.medium,
+  },
+  livePainCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.lg,
+    backgroundColor: Colors.surfaceContainerLowest,
+    borderRadius: Radius.xl,
+    borderLeftWidth: 4,
+    padding: Spacing.lg,
+    ...Shadows.sm,
+  },
+  livePainBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surfaceContainer,
+  },
+  livePainBadgeText: {
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 0.8,
+  },
+  livePainBody: {
+    flex: 1,
+    gap: 2,
+  },
+  livePainLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.semibold,
+    color: Colors.onSurfaceVariant,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  livePainValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: Spacing.sm,
+  },
+  livePainValue: {
+    fontSize: FontSize.xxl,
+    fontWeight: FontWeight.extrabold,
+    letterSpacing: -0.5,
+  },
+  livePainDenominator: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.medium,
+    color: Colors.onSurfaceVariant,
+  },
+  livePainTone: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+  },
+  livePainHint: {
+    fontSize: FontSize.xs,
+    color: Colors.onSurfaceVariant,
   },
 });

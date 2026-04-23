@@ -24,6 +24,7 @@ import {
   ROLE_LABELS,
   setDemoSession,
 } from '../state/session';
+import { D10Logo } from '../components/D10Logo';
 
 interface RoleOption {
   role: DemoRole;
@@ -85,14 +86,7 @@ export function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.brand}>
-            <View style={[styles.logo, Shadows.md]}>
-              <MaterialCommunityIcons
-                name="water"
-                size={32}
-                color={Colors.onPrimary}
-              />
-            </View>
-            <Text style={styles.brandTitle}>D-10 Therapeutics</Text>
+            <D10Logo size="lg" />
             <Text style={styles.brandSubtitle}>Clinical Demo Access</Text>
           </View>
 
@@ -216,24 +210,9 @@ const styles = StyleSheet.create({
   },
   brand: {
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.md,
     marginTop: Spacing.xl,
     marginBottom: Spacing.md,
-  },
-  logo: {
-    width: 64,
-    height: 64,
-    borderRadius: Radius.xl,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  brandTitle: {
-    fontSize: FontSize.xxl,
-    fontWeight: FontWeight.extrabold,
-    color: Colors.onSurface,
-    letterSpacing: -0.5,
   },
   brandSubtitle: {
     fontSize: FontSize.md,
